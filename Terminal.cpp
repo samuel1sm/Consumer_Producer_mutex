@@ -1,145 +1,291 @@
 #include <thread>    
 #include <mutex> 
 #include <iostream>
-#include <chrono>  
-
+#include <chrono> 
+#include <list>
+#include <vector>
+#include "Semaphore.cpp"
 using namespace std;
 
-mutex mtx;
-int arr[30];
-int arr_size = 30;
+struct thread_info {
+    int init;
+    int fin;
+    bool endend;
+};
+
+
+int arr_size = 13;
+int arr[13];
 int current_size = 0;
 
-void prt_arr(char a, int num) {
-    for (int i = 0; i < arr_size; i++ ){
-        cout << arr[i] << " "; 
+vector<thread_info> producer_running_threads_info;
+vector<thread_info> consumer_running_threads_info;
+
+Semaphore* a;
+void reset_threads(bool key_consumer) {
+    if (key_consumer) {
+        for (int i = 0; i < consumer_running_threads_info.size();i++) {
+            
+            consumer_running_threads_info[i].endend = false;
+
+        }
     }
-    
-    cout <<"  s: " <<current_size<< " m: " << a << " " << num << endl;
-    
+    else {
+        for (int i = 0; i < producer_running_threads_info.size(); i++) {
+            producer_running_threads_info[i].endend = false;
+        }
+    }
+
+
 }
 
-void producer( ) {
-    int  item;
-    mtx.lock();
-    bool aux = false;
-    while (true) {
-        if (aux) {
-            mtx.lock();
-            aux = false;
-        }
-           
+bool verify_running_threads_info(bool key_consumer) {
 
-        if (current_size != arr_size) {
+    vector<thread_info> vec = (key_consumer) ? consumer_running_threads_info : producer_running_threads_info;
+    bool result = true;
+    for (int i = 0; i < vec.size(); i++) {
+        result = result && vec[i].endend;
+
+        if (!result)
+            break;
+    }
+  /*  if (key_consumer) {
+        cout << "consumer: " << result << endl;
+    }
+    else {
+        cout << "producer: " << result << endl;
+
+    }*/
+    return result;
+}
+
+void prt_arr() {
+ 
+    while (true)
+    {
+        for (int i = 0; i < arr_size; i++) {
+            cout << arr[i] << " ";
+        }
+        cout << endl;
+
+
+        this_thread::sleep_for(chrono::seconds(1));
+
+    }
+}
+
+void producer(int position) {
+    int  item;
+
+    bool aux = false;
+    a->lock(position);
+    int positions = position;
+    
+    int position_insert = producer_running_threads_info[position].init;
+    int last_position = producer_running_threads_info[position].fin;
+
+
+    int actual_position = position_insert;
+    while (true) {
+        if (aux){
+            a->unlock(position);
+
+            while (producer_running_threads_info[position].endend)
+            {
+                if (verify_running_threads_info(false)) {
+                    a->unlock(position);
+                }
+                a->lock(position);
+
+            }
+
+            actual_position = position_insert;
+
+            aux = false;
+
+        }
+
+        
+         
+        //int size = dinamic_arr.size();
+        int size = current_size;
+        if (actual_position < last_position) {
             this_thread::sleep_for(chrono::seconds(1));
             item = rand() % 8 + 1;
+            //dinamic_arr.push_back(item);
 
-
-            arr[current_size] = item;
+            arr[actual_position] = item;
             current_size++;
-            //cout << "a: " << item << endl;
-            prt_arr('a', item);
+            actual_position++;
+            //prt_arr('a', item);
         }
-        else  {
-            mtx.unlock();
-            //mtx.lock();
+        else {
+            producer_running_threads_info[position].endend = true;
+            //mtx.unlock();
             aux = true;
 
-        }
+            if (verify_running_threads_info(false))
+                reset_threads(true);
 
+            //a->unlock(position);
+            a->unlock(position);
 
-
+        }   
     }
-
-
 }
 
-void consumer( ) {
+void consumer(int position) {
     int item;
-    bool aux = false;
-    mtx.lock();
+    bool aux = true;
+    //mtx.lock();
+    //a->lock(position - consumer_running_threads_info.size());
+
+    int position_insert = consumer_running_threads_info[position].init;
+    int last_position = consumer_running_threads_info[position].fin;
+    int actual_position = last_position;
 
     while (true)
     {
         if (aux) {
-            mtx.lock();
+            //a->lock(position - consumer_running_threads_info.size());
+
+            while (consumer_running_threads_info[position].endend) {
+
+                if (verify_running_threads_info(true)) {
+                    a->unlock(position);
+                }
+                a->lock(position);
+                //a->unlock(position);
+
+                //cout << "a: " << consumer_running_threads_info[position].endend << endl;
+                //mtx.lock();
+            }
+            actual_position = last_position;
             aux = false;
         }
+       
+        //int size = vector_arr.size();
 
-        if (current_size > 0) {
+        //int size = dinamic_arr.size();
+        int size = current_size;
+
+
+        if (actual_position >  position_insert) {
             this_thread::sleep_for(chrono::seconds(1));
-
-            item = arr[current_size - 1];
-            arr[current_size - 1] = 0;
+            //item = dinamic_arr.back();
+            //dinamic_arr.pop_back();
+            item = arr[actual_position-1];
+            arr[actual_position-1] = 0;
             current_size--;
+            actual_position--;
 
-            prt_arr('r', item);
+            /*prt_arr('r', item);*/
             
-
-            //cout << "r: " << item << endl;
-
-            //if (current_size == arr_size - 2) {
-            //    mtx.unlock();
-            //    //mtx.lock();
-
-            //}
-        }  else {
+        }  
+        else {
           
+            consumer_running_threads_info[position].endend = true;
 
-            mtx.unlock();
+            //mtx.unlock();
             aux = true;
+
+            if (verify_running_threads_info(true))
+                reset_threads(false);
+            //a->unlock(position - consumer_running_threads_info.size());
+
+            a->unlock(position);
 
             //mtx.lock();
 
-            //cout << "alou 1" << endl;
 
         }
-
-
     }
 }
 
-void print_block(int n, char c) {
-    // critical section (exclusive access to std::cout signaled by locking mtx):
-    while (true)
-    {
-
-        mtx.lock();
-        //this_thread::sleep_for(chrono::seconds(1));
-
-        for (int i = 0; i < n; ++i) {
-
-            std::cout << c; }
-        std::cout << '\n';
-        mtx.unlock();
-    }
-
-}
-
-void print_block2(int n, char c) {
-    // critical section (exclusive access to std::cout signaled by locking mtx):
-    while (true)
-    {
-        mtx.lock();
-        //this_thread::sleep_for(chrono::seconds(1));
-
-        for (int i = 0; i < n; ++i) { 
-
-            std::cout << c; }
-        std::cout << '\n';
-        mtx.unlock();
-    }
+void fill_thread_info_vector(int theads_qtd, bool is_consumer) {
+    int value = ceil((float)arr_size / theads_qtd);
  
+    for (int i = 0; i < theads_qtd; i++) {
+        thread_info new_t;
+        if (i == 0)
+            new_t.init = i;
+        else
+            if (is_consumer)
+                new_t.init = consumer_running_threads_info[i - 1].init + value;
+            else
+                new_t.init = producer_running_threads_info[i - 1].init + value;
+
+        if (new_t.init> arr_size)
+            new_t.endend = true;
+        else
+            if (is_consumer)
+                new_t.endend = true;
+            else
+                new_t.endend = false;
+
+
+        if (new_t.init + value > arr_size)
+            new_t.fin = arr_size;
+        else
+            new_t.fin = new_t.init + value;
+
+         if (is_consumer)
+           consumer_running_threads_info.push_back(new_t);
+        else
+           producer_running_threads_info.push_back(new_t);
+    }
 }
+
+
 
 
 int main() {
+    int qtd_producer = 2;
+    int qtd_consumer = 3;
+    int qtd_maior = (qtd_consumer > qtd_producer) ? qtd_consumer : qtd_producer;
+    a = new Semaphore(qtd_maior );
 
-    thread th1(producer);
-    thread th2(consumer);
 
-    th1.join();
+
+    fill_thread_info_vector(qtd_producer,false);
+    fill_thread_info_vector(qtd_consumer, true);
+
+    for (int i = 0; i < consumer_running_threads_info.size(); i++)
+        cout << consumer_running_threads_info[i].endend << " " << consumer_running_threads_info[i].init << " " <<consumer_running_threads_info[i].fin<< endl;
+
+
+
+
+
+    for (int i = 0; i < producer_running_threads_info.size(); i++) 
+        cout << producer_running_threads_info[i].endend << " " << producer_running_threads_info[i].init << " " << producer_running_threads_info[i].fin << endl;
+
+    //verify_running_threads_info(true)
+
+    vector<thread> threads;
+
+    for (int i = 0; i < qtd_producer; i++)
+        threads.push_back(thread(producer, i));
+
+
+    for (int i = 0; i < qtd_consumer; i++)
+        threads.push_back(thread(consumer, i));
+
+
+    thread prt_t(prt_arr);
+    prt_t.join();
+
+    for (int i = 0; i < qtd_producer + qtd_consumer; i ++)
+        threads[i].join();
+
+
+    /*thread th1(producer);
+    thread th2(producer);
+    thread th3(consumer);*/
+
+    /*th1.join();
     th2.join();
+    th3.join();*/
 
     return 0;
 }

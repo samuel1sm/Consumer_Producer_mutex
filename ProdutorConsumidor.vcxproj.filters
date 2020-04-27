@@ -18,5 +18,13 @@
     <ClCompile Include="Terminal.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
+    <ClCompile Include="Semaphore.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Semaphore.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
