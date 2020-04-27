@@ -25,7 +25,7 @@ public:
     void lock(int tid) {
         unique_lock<mutex> lc(mtx);
 
-        while (count == 0) {
+        if (count == 0) {
             cv.wait(lc);
             //cout << "thread " << tid << " run" << endl;
         }
