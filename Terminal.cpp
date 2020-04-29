@@ -14,8 +14,8 @@ struct thread_info {
 };
 
 
-int arr_size = 10;
-int arr[10];
+int arr_size = 17;
+int arr[17];
 int current_size = 0;
 
 vector<thread_info> producer_running_threads_info;
@@ -86,7 +86,7 @@ void producer(int position) {
     int  item;
 
     bool aux = false;
-    producer_semaphore->lock(position);
+
     int positions = position;
     
     int position_insert = producer_running_threads_info[position].init;
@@ -96,27 +96,45 @@ void producer(int position) {
     int actual_position = position_insert;
     while (true) {
         if (aux){
-            producer_semaphore->unlock(position);
+            //producer_semaphore->up(position);
 
-            while (producer_running_threads_info[position].endend)
-            {
-                if (verify_running_threads_info(false)) {
-                    producer_semaphore->unlock(position);
-                }
-                producer_semaphore->lock(position);
 
-            }
+
+            //while (!verify_running_threads_info(false)) {
+            //    if (verify_running_threads_info(false)) {
+            //        reset_threads(true);
+            //        for (int i = 0; i < consumer_running_threads_info.size(); i++) {
+            //            consumer_semaphore->up();
+            //        }
+            //        break;
+            //    }
+
+            //}
+          
+
+            producer_semaphore->down(position);
+            //cout << "dasdas" << endl;
 
             actual_position = position_insert;
-
             aux = false;
 
+
+            //while (producer_running_threads_info[position].endend)
+            //{
+            //    if (verify_running_threads_info(false)) {
+            //        producer_semaphore->up(position);
+            //    }
+            //    producer_semaphore->down(position);
+            //}
+            //actual_position = position_insert;
+            //aux = false;
+              
         }
 
         int size = current_size;
         if (actual_position < last_position) {
-            this_thread::sleep_for(chrono::seconds(1));
             item = rand() % 8 + 1;
+            //cout << "producer" << endl;
 
             arr[actual_position] = item;
             current_size++;
@@ -127,13 +145,24 @@ void producer(int position) {
             //mtx.unlock();
             aux = true;
 
-            if (verify_running_threads_info(false))
+            if (verify_running_threads_info(false)) {
+                reset_threads(true);
+                for (int i = 0; i < consumer_running_threads_info.size(); i++) {
+                    consumer_semaphore->up();
+                }
+            }
+
+            /*if (verify_running_threads_info(false)) {
                 reset_threads(true);
 
+            }*/
+
             //a->unlock(position);
-            producer_semaphore->unlock(position);
 
         }   
+
+        this_thread::sleep_for(chrono::seconds(1));
+
     }
 }
 
@@ -147,22 +176,23 @@ void consumer(int position) {
     while (true)
     {
         if (aux) {
-            //a->lock(position - consumer_running_threads_info.size());
-            producer_semaphore->unlock(position);
-
-            while (consumer_running_threads_info[position].endend) {
+         /*   while(!verify_running_threads_info(true)) {
 
                 if (verify_running_threads_info(true)) {
-                    producer_semaphore->unlock(position);
+                    reset_threads(false);
+                    for (int i = 0; i < producer_running_threads_info.size(); i++)
+                        producer_semaphore->up();
+                    break;
                 }
-                producer_semaphore->lock(position);
-                //a->unlock(position);
+              
+            }*/
 
-                //cout << "a: " << consumer_running_threads_info[position].endend << endl;
-                //mtx.lock();
-            }
+            consumer_semaphore->down();
+
             actual_position = last_position;
             aux = false;
+
+ 
         }
        
 
@@ -170,9 +200,9 @@ void consumer(int position) {
 
 
         if (actual_position >  position_insert) {
-            this_thread::sleep_for(chrono::seconds(1));
-   
-            item = arr[actual_position-1];
+               
+            item = arr[actual_position - 1];
+            //cout << "consumer" << endl;
             arr[actual_position-1] = 0;
             current_size--;
             actual_position--;            
@@ -182,12 +212,19 @@ void consumer(int position) {
             consumer_running_threads_info[position].endend = true;
             aux = true;
 
-            if (verify_running_threads_info(true))
-                reset_threads(false);
 
-            producer_semaphore->unlock(position);
+            if (verify_running_threads_info(true)) {
+                reset_threads(false);
+                for (int i = 0; i < producer_running_threads_info.size(); i++){
+                    //cout << "a: dasdasdas "<< endl;
+                    producer_semaphore->up();
+                }
+            }
 
         }
+
+        this_thread::sleep_for(chrono::seconds(1));
+
     }
 }
 
@@ -227,10 +264,10 @@ void fill_thread_info_vector(int theads_qtd, bool is_consumer) {
 
 int main() {
     int qtd_producer = 3;
-    int qtd_consumer = 1;
+    int qtd_consumer = 5;
 
-    producer_semaphore = new Semaphore(qtd_producer);
-    consumer_semaphore = new Semaphore(qtd_consumer);
+    producer_semaphore = new Semaphore(qtd_producer,0);
+    consumer_semaphore = new Semaphore(qtd_consumer,0);
 
     fill_thread_info_vector(qtd_producer,false);
     fill_thread_info_vector(qtd_consumer, true);
@@ -245,8 +282,8 @@ int main() {
         threads.push_back(thread(consumer, i));
 
 
-    thread prt_t(prt_arr);
-    prt_t.join();
+   /* thread prt_t(prt_arr);
+    prt_t.join();*/
 
     for (int i = 0; i < qtd_producer + qtd_consumer; i ++)
         threads[i].join();
